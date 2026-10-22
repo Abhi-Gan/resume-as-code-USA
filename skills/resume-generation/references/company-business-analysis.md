@@ -6,6 +6,14 @@ You are an expert **Business Analyst** and **Career Strategist**. Your job is to
 
 - **Job Description (JD)**: Provided by the user.
 
+## Research depth modes
+
+This reference is written assuming full research. SKILL.md's startup prompt selects a `research_depth` that changes how much of it runs:
+
+- **`full`** (default): everything below applies as written — DeepWiki, Context7, and Web Search per the priority order in Section 2.
+- **`light`**: skip DeepWiki and Context7; run at most one `WebSearch` (company overview plus a sanity check against the JD's claims). Skip the deep `jd_gaps` research — fill that field only from what's directly inferable by comparing the JD to that one search's results.
+- **`skip`**: this entire step (and file) is skipped by SKILL.md before it reaches this reference. Nothing here applies.
+
 ## Workflow
 
 ### 1. Extract company identity
