@@ -102,9 +102,9 @@ The output content (specifically `summary` fields) supports a **limited set of M
 
 ### Template-Specific Rules
 
-These apply on top of everything above, based on the `template` chosen at startup (`jake` or `techCompact`). Default (`jake`) behavior is everything already described in this document — nothing changes for it. The rules below are `techCompact`-only overrides.
+These apply on top of everything above, based on the `template` chosen at startup. `jake` behavior is everything already described in this document — nothing changes for it. The rules below are overrides specific to Tech-Compact-style templates (`tech-compact`, `zhiweio`, and any future template that shares the same content convention).
 
-- **One page is a hard cap, not a soft target.** The "keep it within two pages whenever possible" language elsewhere in this document does not apply — `techCompact` must fit on exactly one US Letter page. If content doesn't fit, cut roles or bullets; do not let it flow to a second page.
+- **One page is a hard cap, not a soft target.** The "keep it within two pages whenever possible" language elsewhere in this document does not apply — Tech-Compact-style templates must fit on exactly one US Letter page. If content doesn't fit, cut roles or bullets; do not let it flow to a second page.
 - **No Personal Summary section exists.** Do not generate one (see `references/section-personal-summary.md`).
 - **No standalone Skills section exists.** The app automatically folds each Work/Project entry's `keywords` into an italicized first bullet instead of rendering a separate Skills section — this is a rendering decision, not something you need to write differently. Just populate `keywords` normally, same as `jake`.
 - **Denser inline bold emphasis.** Bold key nouns and metrics more aggressively than the `jake` default — technical deliverables, scope numbers, and outcome metrics should be bolded throughout each bullet, not just the single headline metric. For example: "Built and optimized **automated E2E QA systems** for compliance-critical workflows, reducing test execution time from minutes to seconds (**60x speedup**)." This is still governed by the same Markdown subset above (`**bold**` only) — just used more densely.
@@ -113,14 +113,14 @@ Note: combining company/location/position (or project name/tagline) into one tit
 
 ### Target Platform Context
 
-The generated content will be compiled by `yamlresume`.
+The generated content will be compiled to PDF via the Typst pipeline (`templates/<name>/adapter.typ`, see `SKILL.md` step 10) — not LaTeX, HTML, or Markdown.
 
 - **Locale**: The final resume will specify a locale (e.g., `en` or `zh`). Ensure content language matches the target locale.
-- **Layouts**: The content will be rendered into PDF (LaTeX), HTML, and Markdown. Ensure text is clean and compatible with multiple renderers.
 
 ### Important Notes
 
 - **Forbidden Sources**: Do NOT read or use content from `*.example.yml` files. Use only the provided session context and generated intermediate files.
+- **Reference resumes**: if the session context includes reference resumes (selected in Step 4 — see [reference-resume-selection.md](reference-resume-selection.md)), mirror their bullet phrasing patterns, voice, and structural conventions. Never pull facts, achievements, or numbers from them — those come only from the Timeline Events provided in this session's context.
 - **Achievements**: Descriptions should be specific and quantified with numbers and results.
 - **Skills**: Descriptions should be comprehensive ability summaries, reflecting years of experience, proficiency level, and application scenarios.
 - **Formatting**: Each skill description should be a complete sentence. Avoid listing specific technology names as tags.
