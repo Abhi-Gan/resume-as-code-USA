@@ -1,20 +1,17 @@
 # YAML Resume Schema Reference
 
-The Resume Builder supports two YAML formats. Files are auto-detected at load time.
-
-- **[New Schema (v1.0)](#new-schema-v10--recommended)** — Recommended. Richer, versioned schema with discriminated section types, stable IDs, visibility flags, and layout hints.
-- **[Legacy Format (YAMLResume)](#legacy-format-yamlresume)** — Compatible with the [YAMLResume](https://yamlresume.dev/docs) ecosystem and its LaTeX compiler.
+This repo uses one YAML format for resume content: **New Schema v1.0**. There is no Legacy/YAMLResume format anymore — the old React/Puppeteer app and the LaTeX/YAMLResume compiler dependency have both been fully retired. Every resume renders via the Typst pipeline (see [`../README.md`](../README.md#typst-rendering-pipeline)).
 
 ---
 
-## New Schema (v1.0) — Recommended
+## New Schema (v1.0)
 
-The new format is a richer, versioned schema owned by the builder app. It supports discriminated section types, stable IDs, visibility flags, layout hints, and flexible content structures.
+Discriminated section types, stable IDs, visibility flags, layout hints, and flexible content structures.
 
 ```yaml
 schema:
   version: '1.0'
-  generator: resume-builder-app
+  generator: resume-as-code
 
 document:
   title: 'My Resume'
@@ -33,12 +30,6 @@ basics:
     - network: GitHub
       url: https://github.com/zhangwei
       username: github.com/zhangwei
-
-# profiles can also be placed here (sibling of basics) for yamlresume compatibility
-# profiles:
-#   - network: GitHub
-#     url: https://github.com/zhangwei
-#     username: github.com/zhangwei
 
 sections:
   - id: work
@@ -117,117 +108,11 @@ order:
   - langAndInterests
 
 layout:
-  template: jake # jake | techCompact — visual template for the app's own preview/PDF export. Optional, defaults to jake.
-  page:
-    size: a4 # a4 | letter 
-    margins: { top: 1.5cm, left: 1.5cm, right: 1.5cm, bottom: 1.5cm }
-    showPageNumbers: true
-  typography:
-    fontSize: 11pt
-
-themeOverrides:
-  spacing:
-    sectionGap: 12
-    entryGap: 8
+  template: tech-compact # any subdirectory of templates/ with an adapter.typ - currently tech-compact | zhiweio
 ```
 
-**`layout.page.size`**: controls the physical paper size used by the resume-builder-app's own React preview and Puppeteer PDF export (not the Legacy/LaTeX engine, which has no paper-size concept). Valid values are `a4` (default) and `letter` (US Letter, 8.5in x 11in). This field is optional — omitting it (or the whole `layout` block) is equivalent to `a4`. Toggling paper size live in the app's Advanced Layout panel does not write back into the YAML; this field only sets the *initial* default when a resume is loaded.
+**`layout.template`**: records which template this resume's content was drafted for — the discovered set under `templates/` (currently `tech-compact`, `zhiweio`; see [`skills/resume-generation/SKILL.md`](../skills/resume-generation/SKILL.md) for how that discovery works). `jake` predates this pipeline and currently has no renderer at all — it is not a selectable option. Optional, defaults to `tech-compact`.
 
-**`layout.template`**: controls the visual template used by the resume-builder-app's own React preview and Puppeteer PDF export (not the Legacy/LaTeX engine, which only supports `jake`). Valid values are `jake` (default — left-aligned name, right-aligned contact, separate Skills section, personal summary) and `techCompact` (centered name/contact header, no personal summary, no standalone Skills section — skills are folded into each Work/Project entry's keywords instead, one-page-oriented). This field is optional — omitting it (or the whole `layout` block) is equivalent to `jake`. As with paper size, toggling the template live in the app's Advanced Layout panel does not write back into the YAML; this field only sets the _initial_ default when a resume is loaded.
+This field matters most _during generation_ — it's what tells the resume-generation skill which structural rules to follow (whether to draft a Skills section, a personal summary, etc. — see `SKILL.md`). It is **not** currently read at render time: the per-resume Typst stub (`data/resumes/{Name}.typ`) hardcodes which template adapter it imports, independent of this field. If you ever hand-edit `layout.template` on an existing resume, the matching stub's `#import` line needs updating to match — see `SKILL.md` step 10 for the rule on how that's done safely (without clobbering any hand-tuned `theme:` overrides in the stub).
 
----
-
-## Legacy Format (YAMLResume)
-
-The [YAMLResume](https://yamlresume.dev/docs) format uses a flat `content` object with fixed section keys. The builder auto-detects this format by the presence of `content` at the root.
-
-```yaml
-locale:
-  language: zh-hans
-
-layouts:
-  - engine: latex
-    sections:
-      aliases:
-        basics: 基本信息
-        work: 工作经历
-        education: 教育经历
-        projects: 项目经历
-        skills: 专业技能
-        certificates: 证书
-      order:
-        - basics
-        - education
-        - work
-        - projects
-        - skills
-        - certificates
-    page:
-      margins: { top: 1.5cm, left: 1.5cm, right: 1.5cm, bottom: 1.5cm }
-      showPageNumbers: true
-    template: jake
-    typography:
-      fontSize: 11pt
-
-content:
-  basics:
-    name: John Doe
-    phone: '+1 555-123-4567'
-    email: john.doe@example.com
-    url: https://johndoe.dev
-    summary: |
-      - 7 years of data engineering experience with Python and SQL.
-      - Experienced in ETL automation, data quality, and monitoring.
-  profiles:
-    - network: GitHub
-      url: https://github.com/johndoe
-      username: johndoe
-  education:
-    - institution: Example University
-      degree: Bachelor
-      area: Computer Science
-      startDate: Sep 1, 2015
-      endDate: Jul 1, 2019
-  work:
-    - name: Acme Inc
-      position: Senior Engineer
-      startDate: Nov 14, 2022
-      endDate: Now
-      summary: |
-        - Built enterprise data platform from scratch.
-      keywords: [Python, React, AWS]
-  projects:
-    - name: Data Platform
-      description: Enterprise lakehouse
-      startDate: Mar 1, 2023
-      endDate: Jan 1, 2024
-      summary: |
-        - End-to-end lakehouse on AWS.
-      keywords: [Databricks, Airflow]
-  skills:
-    - name: Languages
-      keywords: [Python, SQL, TypeScript]
-  certificates:
-    - name: AWS Certified
-      issuer: AWS
-      date: May 2023
-```
-
----
-
-## Format Differences
-
-| Feature            | Legacy (YAMLResume)                    | New Schema (v1.0)                     |
-| ------------------ | -------------------------------------- | ------------------------------------- |
-| Root structure     | `content` object with fixed keys       | `basics` + `sections` array           |
-| Section definition | Fixed keys (`work`, `education`, etc.) | Discriminated union with `type` field |
-| Section ordering   | `layouts[].sections.order`             | Top-level `order` array               |
-| Section titles     | `layouts[].sections.aliases`           | Per-section `title` field             |
-| Item IDs           | Not supported                          | Optional `id` on each item            |
-| Visibility control | Not supported                          | `visible` flag per section/item       |
-| Summary format     | Multiline pipe-string (`\|`)           | Array of strings or pipe-string       |
-| Profiles location  | `content.profiles` (sibling of basics) | `basics.profiles` or root `profiles`  |
-| Language setting   | `locale.language`                      | `document.language`                   |
-| Layout config      | `layouts[]` array (multi-engine)       | Single `layout` object                |
-| Theme overrides    | Not supported                          | `themeOverrides` (colors, spacing)    |
-| Schema versioning  | Not supported                          | `schema.version` field                |
+**Paper size, font size, spacing, and margins are not YAML fields.** They live entirely in the per-resume Typst stub's `theme:` argument (`render(data, theme: (font-size: 9.6pt, margin: (0.3in), ...))`), since they're presentation choices, not resume content. See [`templates/tech-compact/adapter.typ`](../templates/tech-compact/adapter.typ) for the full set of overridable keys and their defaults.

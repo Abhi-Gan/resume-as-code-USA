@@ -24,11 +24,10 @@ If you are unsure which skill applies, classify the user's input first: a JD →
 - **Bilingual organization names**: when stored as `English | 中文`, output only one side in the final resume — Chinese for target languages `zh`, `zh-hans`, `zh-hant-hk`, `zh-hant-tw`; English for `en`, `es`, `fr`, `no`. Do NOT output both unless the user explicitly asks for a bilingual resume.
 - **Authenticity**: never invent skills or tech stacks absent from the candidate's timeline. Inferring specific services within a platform the candidate already uses (e.g. AWS → "Step Functions") is allowed.
 - **Forbidden sources**: never read or copy content from `*.example.yml` / `*.example.md` files — they are structural templates only.
-- **Validation**: after generating a resume YAML, validate it with:
-
-  ```bash
-  pnpm yamlresume validate <path-to-resume.yml>
-  ```
+- **Validation**: resumes validate by compiling the Typst stub: `typst compile --root . <path-to-resume.typ> /dev/null` — see `skills/resume-generation/SKILL.md` step 10. There is no Legacy/YAMLResume/LaTeX path anymore; the `yamlresume` CLI dependency has been removed.
+- **Resume content stays in YAML, never in Typst**: the per-resume Typst stub (`data/resumes/{Name}.typ`) is a mechanically-written 3-line file — it only imports the template adapter and calls `render(data)`. Never author resume content (bullets, titles, dates) as Typst code; content always lives in the YAML, which the stub reads via `yaml()`. This keeps diffs between resume versions clean and avoids Typst compile-error/syntax risk on every edit.
+- **Never silently rewrite an existing `.typ` stub**: if a stub already exists for a resume (a revision pass, not first generation), leave it untouched — it may contain hand-tuned `theme: (...)` overrides (font size, spacing, margin) from a prior "fit to one page" pass. The only exception is patching the `#import` line if `layout.template` changed, and even then only that one line — never the `theme:` block.
+- **Template names are kebab-case** (`tech-compact`, matching the `templates/tech-compact/` directory), not camelCase.
 
 ## Repository layout
 
@@ -37,7 +36,7 @@ AGENTS.md             # This file — universal entry point for any agent
 README.md             # Project overview and quickstart
 skills/               # The three Agent Skills (read these for workflow detail)
 scripts/              # The one-command installer
-resume-builder-app/   # Local-first web app for live preview + PDF export
+templates/            # Typst templates (per-template vendor/ + adapter.typ)
 data/                 # All user-owned content lives here
 ├── profiles/         #   Candidate's static data (basics, education, certificates)
 ├── timeline/         #   Master timeline library (polished work + project YAML)
