@@ -1,9 +1,5 @@
 # Resume as Code
 
-<p align="center">
-  <img src="resume-builder-app/public/favicon.svg" width="72" height="72" alt="Resume Builder logo" />
-</p>
-
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/Node.js-≥18-green.svg)](https://nodejs.org) [![pnpm](https://img.shields.io/badge/pnpm-≥9-orange.svg)](https://pnpm.io)
@@ -15,10 +11,6 @@
 **Stop copy-pasting resumes.** Maintain a single YAML timeline of your career, and let AI agents generate perfectly targeted resumes for every job application — in minutes, not hours.
 
 </div>
-
-![Resume Builder App Screenshot](assets/app-screenshot.png)
-
-> [View sample resume (EN · PDF)](assets/resume.pdf) · [查看中文简历 (PDF)](assets/resume_zh.pdf)
 
 ---
 
@@ -34,7 +26,7 @@
     - [3. Configure your profile](#3-configure-your-profile)
     - [4. Generate a tailored resume](#4-generate-a-tailored-resume)
     - [5. Preview and export PDF](#5-preview-and-export-pdf)
-  - [Resume Builder App](#resume-builder-app)
+  - [Typst Rendering Pipeline](#typst-rendering-pipeline)
   - [AI Agent Skills](#ai-agent-skills)
     - [Agent compatibility](#agent-compatibility)
   - [Project Structure](#project-structure)
@@ -49,9 +41,9 @@
 - **Single source of truth** — all career data lives in modular YAML files (profiles, timeline, drafts)
 - **3 AI agent skills** — resume generation, timeline polishing, and interview preparation, powered by LLMs
 - **10-step generation pipeline** — company research → JD analysis → section generation → de-AI humanization → quality review → revision
-- **Local-first web workbench** — Monaco YAML editor + pixel-perfect A4 preview + one-click PDF export via Puppeteer
-- **Dual YAML format** — auto-detects both the new schema v1.0 and legacy [YAMLResume](https://yamlresume.dev/docs) format
-- **Multi-language** — English, Simplified/Traditional Chinese, Spanish, French, Norwegian, with one-click toggle
+- **Typst rendering pipeline** — YAML content stays the source of truth; a thin per-template Typst adapter handles layout, with per-resume theme overrides (font size, spacing, margin) for fitting content to one page
+- **Single YAML format** — New Schema v1.0 only. There is no Legacy/YAMLResume/LaTeX path anymore; both the old React/Puppeteer app and the LaTeX compiler dependency have been fully retired
+- **Any language, written directly** — Typst falls back to a glyph-capable font automatically (no CJK-aware font config needed), section `title` fields and dates are free text with no reformatting, so non-English resumes work by typing the translated content directly. What's gone is the old automatic layer (`document.language` no longer auto-picks a font, translates titles, or formats dates for you) — not the capability itself.
 - **11+ agent support** — works with Claude Code, Codex, GitHub Copilot, Cursor, Windsurf, Cline, Trae, and more
 
 ---
@@ -82,70 +74,62 @@ Open your AI agent and paste raw descriptions of your past jobs or projects. The
 
 Fill in your static data in `data/profiles/`:
 
-| File               | Content                                           |
-| ------------------ | ------------------------------------------------- |
-| `basics.yml`       | Name, phone, email, URL, summary, social profiles |
-| `education.yml`    | Institutions, degrees, dates                      |
-| `certificates.yml` | Certifications                                    |
+| File                         | Content                                                                                                                                | Required?                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `basics.yml`                 | Name, phone, email, URL, summary, social profiles                                                                                      | Yes                                                     |
+| `education.yml`              | Institutions, degrees, dates                                                                                                           | Yes                                                     |
+| `certificates.yml`           | Certifications                                                                                                                         | Yes                                                     |
+| `writing-style.md`           | Personal phrasing preferences (bolding density, verb variety, ATS habits) — read by the Resume Generation Agent while drafting bullets | Optional — skipped silently if absent                   |
+| `generation-preferences.yml` | Your personal defaults for the Resume Generation Agent's startup prompt (research depth, template, review/revision settings)           | Optional — falls back to the skill's hardcoded defaults |
 
-Example templates are provided — copy `basics.example.yml` → `basics.yml` and edit.
+Example templates are provided for every file above — copy `basics.example.yml` → `basics.yml` (same pattern for `writing-style.example.md`, `generation-preferences.example.yml`, etc.) and edit.
 
 ### 4. Generate a tailored resume
 
-Paste a Job Description into your agent. The **Resume Generation Agent** will:
+Paste a Job Description into your agent. The **Resume Generation Agent** will ask a quick startup prompt (research depth, template, review/revision settings — defaults can be preset in `generation-preferences.yml`), then:
 
-1. Research the company's business context
+1. Research the company's business context (depth configurable: full / light / skip)
 2. Deep-analyze the JD to infer actual role requirements
 3. Match relevant experiences from your timeline
 4. Generate tailored sections (projects → work → skills → summary)
 5. Assemble, de-AI humanize, review, and optionally revise
 
-Output: `data/resumes/{Name}_{JobTitle}_{Company}.yml`
+Output: `data/resumes/{Name}_{JobTitle}_{Company}.yml`, plus a matching `data/resumes/{Name}_{JobTitle}_{Company}.typ` stub (see below).
 
 ### 5. Preview and export PDF
 
+Every resume renders via Typst. The `.typ` file next to your resume's YAML is a complete, self-contained Typst document — open it directly in any Typst-aware editor (e.g. [Typstify](https://marketplace.visualstudio.com/items?itemName=typstify.typstify) or [tinymist](https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist) in VS Code) for a live PDF preview on save, or compile it once from the command line:
+
 ```bash
-cd resume-builder-app
-pnpm install    # also installs Chrome for Puppeteer
-pnpm dev
+typst compile --root . "data/resumes/Your_Resume.typ" Your_Resume.pdf
 ```
 
-Open [localhost:5173](http://localhost:5173), load your YAML, preview, optimize layout, and export PDF.
+If a resume runs long, nudge font size, spacing, or margin in that `.typ` file's `theme: (...)` block rather than editing the YAML or the template — see [`templates/tech-compact/adapter.typ`](templates/tech-compact/adapter.typ) for the overridable keys.
 
 ---
 
-## Resume Builder App
+## Typst Rendering Pipeline
 
-A local-first resume workbench with a split-pane editor/preview layout, built with React, Vite, Monaco Editor, Tailwind CSS, and Puppeteer.
+Each resume has two files: the YAML (content — the only thing you or your agent should edit) and a matching `.typ` stub (rendering wiring, mechanically generated, not hand-authored content):
 
-**Key features:**
-
-| Feature                  | Description                                                         |
-| ------------------------ | ------------------------------------------------------------------- |
-| Split Editor + Preview   | Monaco YAML editor left, pixel-perfect A4 preview right             |
-| Live Validation          | Real-time YAML syntax and schema validation with inline diagnostics |
-| Deterministic Pagination | Block-level pagination with keep-together logic                     |
-| Optimize Layout          | One-click spacing optimization (0.7×–1.3× scale)                    |
-| PDF Export               | Local Puppeteer + headless Chromium for high-fidelity PDF           |
-| Language Toggle          | Switch 中文 / English rendering with one click                      |
-| Dual Format              | Auto-detects legacy yamlresume or new schema v1.0 YAML              |
-
-**Quick start:**
-
-```bash
-cd resume-builder-app
-pnpm install
-pnpm dev        # Web: :5173, PDF export: :3001
-pnpm build      # Production build
+```
+data/resumes/Your_Resume.yml    # content — bullets, dates, keywords
+data/resumes/Your_Resume.typ    # 3-line stub: imports the template, loads the YAML, renders it
 ```
 
-The app also supports the [YAMLResume CLI](https://yamlresume.dev/docs) for LaTeX-based PDF generation:
+A per-template Typst **adapter** (`templates/<name>/adapter.typ`) sits between the two — it reads the YAML and calls into a **vendored** Typst template (`templates/<name>/vendor/`) for actual layout/typography. The adapter is built once per template and almost never touched again; per-resume generation only ever changes the YAML.
 
-```bash
-pnpm yamlresume build "data/resumes/Your_Resume.yml"
+The `.typ` stub is also where **per-resume presentation overrides** live — font size, line spacing, margin, paper size — passed as a `theme:` argument, separate from both content and template code:
+
+```typst
+#import "../../templates/tech-compact/adapter.typ": render
+#let data = yaml("Your_Resume.yml")
+#render(data, theme: (font-size: 9.6pt, margin: (0.3in)))
 ```
 
-See [`resume-builder-app/README.md`](resume-builder-app/README.md) for full architecture and development details.
+Most resumes never need a `theme:` override; add one when a specific resume runs long and needs tightening to fit one page. See [`templates/tech-compact/adapter.typ`](templates/tech-compact/adapter.typ) for the full list of overridable keys and their defaults.
+
+`template = jake` predates this pipeline and currently has **no renderer at all** — its only two renderers (the old React/Puppeteer app, and the LaTeX/YAMLResume path) have both been removed. It's not a selectable option anymore (see `skills/resume-generation/SKILL.md`). Onboarding it as a real option again is a matter of repeating the same vendor + adapter pattern under `templates/jake/`.
 
 ---
 
@@ -192,7 +176,8 @@ See [`skills/README.md`](skills/README.md) for detailed agent instructions and h
 │   └── interview-preparation/#   Resume + JD → interview guide
 ├── scripts/
 │   └── install-skills.mjs    # One-command multi-agent installer
-├── resume-builder-app/       # Local-first web workbench (React + Vite + Puppeteer)
+├── templates/                # Typst rendering templates
+│   └── tech-compact/         #   vendor/ (upstream template) + adapter.typ
 ├── data/                     # All user-owned content
 │   ├── profiles/             #   Static candidate data (basics, education, certificates)
 │   ├── timeline/             #   Master timeline library (polished YAML)
@@ -201,19 +186,16 @@ See [`skills/README.md`](skills/README.md) for detailed agent instructions and h
 │   ├── interviews/           #   Generated interview guides
 │   └── .cache/               #   Per-run intermediate artifacts (gitignored)
 └── docs/
-    └── yaml-schema.md        # YAML format reference (new schema v1.0 + legacy)
+    └── yaml-schema.md        # YAML format reference (New Schema v1.0)
 ```
 
 ---
 
 ## YAML Resume Schema
 
-The builder supports two YAML formats, auto-detected at load time:
+Resumes are New Schema v1.0 — discriminated section types, stable IDs, layout hints, theme overrides. There is no Legacy/YAMLResume format anymore.
 
-- **New Schema v1.0** — discriminated section types, stable IDs, visibility flags, layout hints, theme overrides
-- **Legacy (YAMLResume)** — compatible with the [YAMLResume](https://yamlresume.dev/docs) ecosystem and its LaTeX compiler
-
-For full schema documentation with examples and a comparison table, see **[docs/yaml-schema.md](docs/yaml-schema.md)**.
+For full schema documentation with examples, see **[docs/yaml-schema.md](docs/yaml-schema.md)**.
 
 ---
 

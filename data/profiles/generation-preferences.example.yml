@@ -1,0 +1,17 @@
+# Personal defaults for the resume-generation skill's startup prompt.
+# Optional: if this file is absent, the skill uses its own hardcoded defaults.
+# Any field may be omitted; an omitted field falls back to the hardcoded default.
+# This is NOT for phrasing/voice preferences -- see writing-style.md for that.
+
+# full | light | skip -- see SKILL.md "Review & Revision Options" and
+# references/company-business-analysis.md / job-analysis.md for what each does.
+research_depth: full
+
+# any subdirectory of templates/ that has an adapter.typ (see SKILL.md) -- currently tech-compact | zhiweio
+template: tech-compact
+
+# yes | no -- auto review + revise after generation
+auto_review: yes
+
+# 1 | 2 | 3 -- review-revise cycles when auto_review (or a HITL "yes") runs
+revision_rounds: 1

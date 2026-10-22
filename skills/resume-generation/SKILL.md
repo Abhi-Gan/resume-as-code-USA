@@ -5,7 +5,9 @@ description: Generate a highly targeted YAML resume from a Job Description. Use 
 
 # Resume Generation
 
-Produce one tailored resume in YAML for a single Job Description, by combining the candidate's master timeline with JD-specific analysis. The result is validated and placed under `data/resumes/`.
+Produce one tailored resume in YAML for a single Job Description, by combining the candidate's master timeline with JD-specific analysis. The result is placed under `data/resumes/`, alongside a matching Typst stub file (see step 10) — that stub, not the YAML, is what actually gets compiled to a PDF.
+
+This skill only supports the Typst rendering pipeline. There is no Legacy/YAMLResume/LaTeX path anymore — both the old React/Puppeteer app and the LaTeX escape hatch have been fully retired. Every resume is New Schema v1.0 YAML, rendered by a template under `templates/`.
 
 ## When to trigger
 
@@ -16,42 +18,46 @@ Activate when the user supplies a Job Description (raw text, a link, or a file p
 - `data/profiles/basics.yml`
 - `data/profiles/education.yml`
 - `data/profiles/certificates.yml`
+- `data/profiles/writing-style.md` (optional — personal phrasing preferences; skip silently if absent, since this file is per-user and not everyone using this repo will have one)
+- `data/profiles/generation-preferences.yml` (optional — personal defaults for the startup prompt below, e.g. preferred research depth or template; skip silently if absent and fall back to this skill's hardcoded defaults. Not for phrasing — that's `writing-style.md`.)
 - All files under `data/timeline/*.yml`
 - The user-provided JD
+- Existing files under `data/resumes/` (as style reference — see step 4)
 
 ## Outputs you will produce
 
 - Intermediate artifacts in `data/.cache/<UTC-Timestamp>/` (one per generation run).
 - Final resume in `data/resumes/{CandidateName}_{JobTitle}_{Company}.yml`.
+- A matching Typst stub, `data/resumes/{CandidateName}_{JobTitle}_{Company}.typ` (see step 10).
 
 ## Review & Revision Options
 
+**Sourcing defaults**: before presenting the prompt below, check whether `data/profiles/generation-preferences.yml` was found in the Inputs step. Any field it sets overrides that option's hardcoded default shown in brackets below; fields it omits keep the hardcoded default. This file only changes what counts as "default" — the prompt is still shown every run so the user can override per-generation.
+
+**Discover available templates** before presenting the prompt below: list the subdirectories of `templates/` that contain an `adapter.typ` (currently `tech-compact`, `zhiweio`). This is the complete, only set of valid template options — it grows automatically as templates are added under `templates/<name>/`; never hardcode it.
+
+**Two different kinds of "which template" rules exist in this document — don't conflate them:**
+
+- **Mechanical/pipeline rules** (which stub to generate, what import path it uses, how paper size is set, how validation runs) apply to **any** discovered template uniformly — this is template-agnostic infrastructure, substitute whichever name was chosen.
+- **Content-structure rules** (no standalone Skills section, no personal summary, one-page hard cap, Experience/Research split) are specific to templates that share the original Tech-Compact content convention. Currently that's `tech-compact` and `zhiweio` (`zhiweio` was built to replicate the same source design) — referred to below as **Tech-Compact-style templates**. A future template could legitimately want a Skills section and personal summary; don't assume every template follows this convention by default.
+
 Before starting the pipeline, present the user with these options:
 
-1. **Auto review + revise** — should the pipeline automatically review and revise the resume after De-AI? (default: `yes`)
-2. **Revision rounds** — how many review-revise cycles to run? (default: `1`, options: `1` / `2` / `3`)
-3. **yamlresume compatibility** — should the final output pass `pnpm yamlresume validate`? (default: `no`)
-4. **Template** — which visual template should this resume use? (default: `jake`, options: `jake` / `techCompact`)
+1. **Research depth** — how much external company/tech research to do in steps 2-3? (default: `full`, options: `full` / `light` / `skip` — see routing under step 2)
+2. **Auto review + revise** — should the pipeline automatically review and revise the resume after De-AI? (default: `yes`)
+3. **Revision rounds** — how many review-revise cycles to run? (default: `1`, options: `1` / `2` / `3`)
+4. **Template** — which visual template should this resume use? (default: `tech-compact`, options: the discovered `templates/` list)
 
-Present as a single prompt:
+Present as a single prompt (substituting any overridden defaults from `generation-preferences.yml`, and the discovered template list from above):
 
 > Resume generation pipeline ready. Quick setup:
 >
-> 1. Auto review & revise after generation? [Y/n]
-> 2. Review-revise rounds? [1/2/3] (default: 1)
-> 3. yamlresume format compatibility? [y/N] (default: no)
-> 4. Template? [jake/techCompact] (default: jake)
+> 1. Research depth? [full/light/skip] (default: full)
+> 2. Auto review & revise after generation? [Y/n]
+> 3. Review-revise rounds? [1/2/3] (default: 1)
+> 4. Template? [tech-compact/zhiweio] (default: tech-compact)
 
-If the user does not respond, use defaults (`yes`, `1`, `no`, `jake`). Store the answers in the run context for steps 5, 6, and 10.
-
-**Template compatibility note**: `techCompact` is only supported in New Schema v1.0 format (the resume-builder-app's own React/Puppeteer renderer). If the user chose `yamlresume compatible = yes` (Legacy format) **and** `techCompact`, tell them Tech-Compact isn't representable in the Legacy/LaTeX pipeline and confirm whether to switch to New Schema or fall back to `jake`. Do not silently ignore the conflict.
-
-**Format routing:**
-
-- yamlresume compatible = `yes` → generate in **Legacy (YAMLResume)** format. Use [assets/resume.example.yml](assets/resume.example.yml) as the structural template for step 6, and `assets/section-*.example.yml` for step 5.
-- yamlresume compatible = `no` → generate in **New Schema v1.0** format. Use [assets/resume-new-schema.example.yml](assets/resume-new-schema.example.yml) as the structural template for step 6, and `assets/section-*.new-schema.example.yml` for step 5.
-
-Store the chosen format (`legacy` or `new-schema`) in the run context for steps 5–10.
+If the user does not respond, use the (possibly overridden) defaults. Store the answers in the run context for steps 2, 3, 5, 6, and 10.
 
 ## Workflow
 
@@ -61,17 +67,27 @@ Create `data/.cache/<UTC-Timestamp>/` (e.g. `data/.cache/20260608_104500/`). All
 
 ### 2. Analyze the company and business context
 
-Follow [references/company-business-analysis.md](references/company-business-analysis.md). Save the result to `data/.cache/<Timestamp>/company-business-analysis.yml`.
+**Routed by the `research_depth` answer from the startup prompt:**
 
-Use DeepWiki, Context7, and Web Search as directed in the reference to build a complete picture of the company's business lines, strategic direction, tech stack, and the business unit this role supports. This output is **required input** for the next step.
+- **`full`** (default): Follow [references/company-business-analysis.md](references/company-business-analysis.md) in full. Use DeepWiki, Context7, and Web Search as directed in the reference to build a complete picture of the company's business lines, strategic direction, tech stack, and the business unit this role supports. Save the result to `data/.cache/<Timestamp>/company-business-analysis.yml`.
+- **`light`**: Follow the same reference, but skip DeepWiki and Context7 and run at most one `WebSearch` (company overview + a sanity check against the JD's claims). Skip the `jd_gaps` deep-dive research; fill it only from what's directly inferable by comparing the JD to that one search's results. Save the (shorter) result to the same path.
+- **`skip`**: Do not run this step. No company-business-analysis file is produced; downstream steps treat it as absent.
+
+This output, when produced, is **required input** for the next step.
 
 ### 3. Analyze the JD
 
 Follow [references/job-analysis.md](references/job-analysis.md). Save the result to `data/.cache/<Timestamp>/job-analysis.yml`. The `language` field detected here governs the entire downstream pipeline.
 
-This step **must consume the company business analysis** from step 2. The JD alone is not enough — job requirements are inseparable from business context. The output includes a `rewritten_jd` field that is sharper and more honest than the raw HR posting. The resume generation steps target this rewritten JD, not the original.
+**Routed by the same `research_depth` answer:**
 
-### 4. Gather context and match timelines
+- **`full`**: consume the company business analysis from step 2 as primary context, and research the technical landscape (Context7, DeepWiki, WebSearch) as directed in the reference.
+- **`light`**: consume the (lighter) company business analysis from step 2, but skip the technical-landscape research sweep — rely on existing knowledge of named technologies instead of looking them up.
+- **`skip`**: no company business analysis exists. Work directly from the raw JD text and existing knowledge, with no external tool calls. Still produce every field in the output format, but any field that normally depends on business-context inference (e.g. `hidden_requirements`, the business-framing parts of `candidate_profile`) should be filled conservatively from the JD alone, or omitted rather than guessed.
+
+When a company business analysis exists, its output includes a `rewritten_jd` field that is sharper and more honest than the raw HR posting, and the resume generation steps target that rewritten JD, not the original. In `skip` mode there is no rewrite pass beyond what `job-analysis.md` itself produces from the JD directly.
+
+### 4. Gather context, match timelines, and select reference resumes
 
 - Read all files in `data/timeline/`.
 - Select the work and project entries most relevant to the Job Analysis and Company Analysis. Filter out clearly irrelevant ones; prioritize the rest.
@@ -79,61 +95,39 @@ This step **must consume the company business analysis** from step 2. The JD alo
 - **Non-selected projects are still mined for signal**: any unselected project that contains JD-relevant capability, domain experience, architecture, or delivery outcomes must contribute those signals into the generated Work Experience or Skills section so they are not lost.
 - **Resume length budget**: optimize for focus and scannability, ideally fitting within **two pages**. Preserve complete chronology, but compress older roles and non-flagship project detail before trimming the two highlighted projects.
 - **Name localization**: if a school or organization name is stored in bilingual form `English | 中文`, output only one side based on target language — Chinese side for `zh`, `zh-hans`, `zh-hant-hk`, `zh-hant-tw`; English side for `en`, `es`, `fr`, `no`. Do **NOT** output both names in a monolingual resume.
+- **Select reference resumes for style consistency**: follow [references/reference-resume-selection.md](references/reference-resume-selection.md) to pick 2-3 existing resumes from `data/resumes/` most similar to this JD, or ask the user if the choice is ambiguous. Save the selection to `data/.cache/<Timestamp>/reference-resumes.yml`. These are style/structural exemplars only, read once here and carried forward mentally into step 5 — never re-read them per section, and never source facts from them.
 
-### 5. Generate sections, in this order
+### 5. Generate all sections in one combined pass
 
-Pass Job Analysis (including `language`), Company Business Analysis, and the matched context to each step. Save each output under `data/.cache/<Timestamp>/`.
+Read [references/overview.md](references/overview.md) and all four section references below **before drafting anything**. Then draft Projects, Work, Skills, and Personal Summary as **one continuous generation pass**, not four separate turns — later sections must see and stay consistent with the sections drafted earlier in this same pass, since Skills is derived from the Work/Projects you just wrote and Personal Summary is derived from all three (see `overview.md`'s Generation Workflow & Context).
 
-**Format-aware generation** — use the format chosen at startup:
+**Before writing a single bullet**: if `data/profiles/writing-style.md` exists (read in the Inputs step above), apply its rules to every bullet across all sections below — as you draft, not as a cleanup pass afterward. Skip a rule for a specific bullet if applying it would produce an awkward or unclear sentence, or would conflict with another rule in this document (e.g. the no-fabrication or humanizer rules). This is in addition to, not a replacement for, mirroring the reference resumes' structural conventions.
 
-- **Legacy path**: each section uses pipe-string `summary: |` syntax. Reference `assets/section-{name}.example.yml` for structure.
-- **New Schema path**: each section uses array `summary: []` syntax (each bullet as a separate string). Each item must include an `id` field. Reference `assets/section-{name}.new-schema.example.yml` for structure.
+Hold Job Analysis (including `language`), Company Business Analysis, the matched context, and the reference resumes selected in step 4 (if any) as shared context for the whole pass — do not re-fetch them per section.
 
-1. **Projects** — see [references/section-projects.md](references/section-projects.md). At most **two** highlighted projects. Save as `section-projects.yml`.
-2. **Work Experience** — see [references/section-work.md](references/section-work.md). Save as `section-work.yml`.
-3. **Skills** — see [references/section-skills.md](references/section-skills.md). Save as `section-skills.yml`. **Skip this step entirely when `template = techCompact`** — this template has no standalone Skills section; the same keyword signal is folded into each Work/Project entry's first bullet instead (see section-work.md / section-projects.md's Tech-Compact rules).
-4. **Personal Summary** — see [references/section-personal-summary.md](references/section-personal-summary.md). **Crucial**: also pass the generated `section-projects.yml`, `section-work.yml`, and `section-skills.yml` so the summary reflects the tailored resume. Save as `section-personal-summary.yml`. **Skip this step entirely when `template = techCompact`** — this template has no personal summary section at all.
+Each section uses array `summary: []` syntax (each bullet as a separate string, never a pipe-string `|` block). Each item must include an `id` field. Reference `assets/section-{name}.example.yml` for structure.
 
-Detailed length budgets, ATS rules, supported Markdown subset, and authenticity rules live in [references/overview.md](references/overview.md). Read it before generating sections — it also has a **Template-Specific Rules** section covering `techCompact`'s one-page hard cap and bullet conventions.
+Draft in this order, within the single pass:
+
+1. **Projects** — see [references/section-projects.md](references/section-projects.md). At most **two** highlighted projects.
+2. **Work Experience** — see [references/section-work.md](references/section-work.md). Must stay consistent with the Projects just drafted: don't restate a flagship project's achievements under Work — absorb signal from the *un*selected projects instead (per the reference's Project-to-Work Synthesis rule).
+3. **Skills** — see [references/section-skills.md](references/section-skills.md). Extract this section from the Work and Projects content just drafted, so keyword claims stay aligned with what the resume actually demonstrates elsewhere — do not re-derive it independently from raw timeline data. **Style reset — do not carry over momentum from steps 1-2**: Skills bullets must NOT be quantified (no numbers, percentages, or KPI-style phrasing), which is the opposite of the Work/Projects rule immediately above. **Skip this step entirely for Tech-Compact-style templates** (`tech-compact`, `zhiweio`) — these have no standalone Skills section; the same keyword signal is folded into each Work/Project entry's first bullet instead (see section-work.md / section-projects.md's Tech-Compact rules).
+4. **Personal Summary** — see [references/section-personal-summary.md](references/section-personal-summary.md). Synthesize from the Projects, Work, and Skills just drafted so the summary reflects the tailored resume. **Skip this step entirely for Tech-Compact-style templates** — these have no personal summary section at all.
+
+**Save each section to its own file** under `data/.cache/<Timestamp>/`: `section-projects.yml`, `section-work.yml`, `section-skills.yml`, `section-personal-summary.yml`. One drafting pass produces four separate artifacts, so step 6 (and any later ad hoc regeneration of a single section) can still target one file directly.
+
+Detailed length budgets, ATS rules, supported Markdown subset, and authenticity rules live in [references/overview.md](references/overview.md) — this is the file you already read at the top of this step; it also has a **Template-Specific Rules** section covering Tech-Compact-style templates' one-page hard cap and bullet conventions.
 
 ### 6. Assemble the final resume
 
-Merge into one YAML file. Use the structural template matching your chosen format — do not copy its content. Sources:
+Merge into one YAML file. Use [assets/resume.example.yml](assets/resume.example.yml) as the structural template — do not copy its content. Sources:
 
-- `data/profiles/basics.yml` (basics — merge the generated summary into `basics.summary`, unless `template = techCompact`, in which case leave `basics.summary` empty/omitted since step 5 skipped generating one)
-- `data/profiles/education.yml` — if an entry has a distinct `gpa` field, pass it through as `gpa` on the assembled education item (New Schema only; Legacy has no `gpa` field). This is what lets Tech-Compact render it on its own row — the app ignores `gpa` for `jake`. If the source only has GPA embedded in `summary` prose (older profile data), leave it as-is; this isn't a required migration.
+- `data/profiles/basics.yml` (basics — merge the generated summary into `basics.summary`, unless using a Tech-Compact-style template, in which case leave `basics.summary` empty/omitted since step 5 skipped generating one)
+- `data/profiles/education.yml` — if an entry has a distinct `gpa` field, pass it through as `gpa` on the assembled education item. Tech-Compact-style templates' Typst adapters render this on its own row when present. If the source only has GPA embedded in `summary` prose (older profile data), leave it as-is; this isn't a required migration.
 - `data/profiles/certificates.yml`
-- `data/.cache/<Timestamp>/section-{personal-summary,skills,work,projects}.yml` — for `template = techCompact`, `section-personal-summary.yml` and `section-skills.yml` won't exist (step 5 skipped them); only merge `section-work.yml` and `section-projects.yml`.
+- `data/.cache/<Timestamp>/section-{personal-summary,skills,work,projects}.yml` — for Tech-Compact-style templates, `section-personal-summary.yml` and `section-skills.yml` won't exist (step 5 skipped them); only merge `section-work.yml` and `section-projects.yml`.
 
-**Profiles (social links)**: always include `profiles` from `data/profiles/basics.yml` if present (e.g. GitHub, LinkedIn). This is mandatory for both formats.
-
-**Order**: always include section display order. This is mandatory for both formats.
-
-#### Legacy path (yamlresume compatible = yes)
-
-Use [assets/resume.example.yml](assets/resume.example.yml) as the structural template.
-
-**Section order is strict** — `content` must follow `layouts.sections.order`:
-
-```
-basics → education → work → skills → certificates → projects
-```
-
-**Locale**: set `locale.language` from the Job Analysis `language` field, or to the language the user explicitly requested. Supported: `en`, `zh-hans`, `zh-hant-hk`, `zh-hant-tw`, `es`, `fr`, `no`.
-
-**Layout defaults** (match the structure in `assets/resume.example.yml`):
-
-- LaTeX engine: `template: jake`, font size `10pt | 11pt | 12pt` (default `11pt`), page margins `1.5cm` all sides, `showPageNumbers: true`.
-- Markdown engine: defaults.
-- HTML engine: `template: jake`, font size in `px` from `14px` to `20px` (default `16px`).
-
-**Template note**: the Legacy/LaTeX pipeline only supports `jake`. If the startup answer was `techCompact`, this should not happen (see the compatibility note under Review & Revision Options) — if it does, fall back to `jake` here and flag it in your final report.
-
-**Profiles placement**: `profiles` appears under `content` as a sibling of `basics` (or inside `content.basics.profiles`).
-
-#### New Schema path (yamlresume compatible = no)
-
-Use [assets/resume-new-schema.example.yml](assets/resume-new-schema.example.yml) as the structural template.
+**Profiles (social links)**: always include `profiles` from `data/profiles/basics.yml` if present (e.g. GitHub, LinkedIn).
 
 **Top-level structure**: `schema` → `document` → `basics` → `order` → `sections`.
 
@@ -141,15 +135,12 @@ Use [assets/resume-new-schema.example.yml](assets/resume-new-schema.example.yml)
 - `document.title`: `"{JobTitle} – {Company}"`
 - `document.language`: from Job Analysis `language` field. Supported: `en`, `zh-hans`, `zh-hant-hk`, `zh-hant-tw`, `es`, `fr`, `no`.
 - `basics`: name, headline, phone, email, url, summary (as `string[]`), profiles
-- `order`: `["education", "work", "skills", "certificates", "projects"]` — for `template = techCompact`, drop `"skills"` from this list (no standalone Skills section exists for this template).
+- `order`: `["education", "work", "skills", "certificates", "projects"]` — for Tech-Compact-style templates, drop `"skills"` from this list (no standalone Skills section exists for these templates).
 - `sections`: array of discriminated section objects, each with `id`, `type`, `items`
 
-**Template-aware `layout` block** (New Schema only):
+**`layout` block**: write `layout: { template: <chosen-name> }`, using whichever template name was chosen at startup. Paper size is not set here — it's a Typst theme default in that template's `templates/<name>/adapter.typ`, not a content field. Do not add a `page:` sub-block; it's not read by anything.
 
-- `template = jake` (default): omit the `layout` block entirely, or write `layout: { template: jake }` — both are equivalent, since `jake`/`a4` are the app's own defaults.
-- `template = techCompact`: write `layout: { template: techCompact, page: { size: letter } }`. Tech-Compact always uses US Letter paper — this is not a separate question, it's implied by the template choice.
-
-**Experience/Research split** (New Schema only, `template = techCompact`): if the candidate's matched work entries include both industry roles and academic/research roles, split them into two separately-titled `work`-type sections instead of one — e.g. `{ id: work, type: work, title: Experience, items: [...] }` and `{ id: research, type: work, title: Research, items: [...] }`, both listed in `order` adjacent to each other. This is valid today because sections are keyed by `id`, not `type` — two sections can share `type: work`. This split is optional for `jake`.
+**Experience/Research split** (Tech-Compact-style templates): if the candidate's matched work entries include both industry roles and academic/research roles, split them into two separately-titled `work`-type sections instead of one — e.g. `{ id: work, type: work, title: Experience, items: [...] }` and `{ id: research, type: work, title: Research, items: [...] }`, both listed in `order` adjacent to each other. This is valid today because sections are keyed by `id`, not `type` — two sections can share `type: work`.
 
 **Profiles placement**: `profiles` appears under `basics.profiles`.
 
@@ -182,10 +173,7 @@ After assembling the YAML, run a humanizer pass to strip AI writing patterns fro
 - Skills group `summary` (if present)
 - Any `description` fields
 
-**Format-aware processing**:
-
-- **Legacy path**: `summary` fields are pipe-strings (`|`). Process the multiline string in place, rewriting each bullet line independently.
-- **New Schema path**: `summary` fields are `string[]`. Process each array element independently — each element is a single bullet string. Edit the array elements in place, preserving the array structure.
+`summary` fields are `string[]`. Process each array element independently — each element is a single bullet string. Edit the array elements in place, preserving the array structure.
 
 **Constraints**:
 
@@ -199,30 +187,31 @@ After assembling the YAML, run a humanizer pass to strip AI writing patterns fro
 
 Follow [references/resume-review.md](references/resume-review.md). Read the De-AI'd resume YAML, `job-analysis.yml`, and `company-business-analysis.yml`. Save the review output to `data/.cache/<Timestamp>/resume-review.yml`.
 
-The review produces a structured YAML analysis covering first impression, deep audit (holistic + per-section), revision blueprint, and final verdict.
+The review produces a structured YAML analysis covering first impression, deep audit (holistic + per-section), revision blueprint, and final verdict. **This audit is always full and holistic** — every round re-audits the whole resume, never just the sections a prior round changed, regardless of how the routing below plays out.
 
-**HITL checkpoint** (skipped in auto mode):
+**Routing**:
 
-If the user chose auto review+revise at startup, proceed directly to step 9. Otherwise, present the review summary (final_verdict + summary counts) and ask:
+- **Auto mode** (user chose auto review+revise at startup): continue directly into step 9 in the same pass — do not stop and start a new turn. There is no user decision gating this, so review and revision are one continuous pass; only the artifacts (`resume-review.yml`, then the revised resume) are still saved as separate files.
+- **HITL mode**: stop here. Present the review summary (final_verdict + summary counts) and ask:
 
-> Review complete. Score: {score}/100 | Issues: {total} ({fail} critical, {warn} warnings). Would you like to revise? [y/N]
+  > Review complete. Score: {score}/100 | Issues: {total} ({fail} critical, {warn} warnings). Would you like to revise? [y/N]
 
-If the user declines, skip step 9 and proceed to step 10.
+  If the user declines, skip step 9 and proceed to step 10.
 
 ### 9. Revise the resume (optional)
 
 If revision was selected (auto or HITL-confirmed):
 
-Follow [references/resume-revision.md](references/resume-revision.md). Read `resume-review.yml` and the current resume YAML. Produce the revised resume and overwrite the assembled YAML file.
+Follow [references/resume-revision.md](references/resume-revision.md). Read `resume-review.yml` and the current resume YAML. Produce the revised resume and overwrite the assembled YAML file. Per that reference, only the sections listed in `resume-review.yml`'s `summary.sections_needing_revision` are modified — every other section is copied verbatim.
 
-**Mandatory De-AI after every revision**: after the revision overwrites the YAML, immediately run the humanizer pass (step 7 rules) on the revised text. The humanizer selection (English vs Chinese) is the same as step 7. This ensures the final output is always free of AI writing patterns — regardless of how many revision rounds run.
+**Scoped De-AI after revision**: run the humanizer pass (step 7 rules) only on the fields belonging to the sections in `summary.sections_needing_revision` — the same sections revision just touched. Do not re-run it over the whole resume: sections outside that list were left untouched by revision and already passed humanization in an earlier pass (step 7, or a prior round's step 9), so reprocessing them is redundant. The humanizer selection (English vs Chinese) is the same as step 7.
 
-**Multi-round loop**: after the humanizer pass, if more rounds remain (based on startup option), loop back to step 8 for another review pass. Each round's review is saved as `resume-review-round{N}.yml` in the same cache directory.
+**Multi-round loop**: after the scoped humanizer pass, if more rounds remain (based on startup option), loop back to step 8 for another full review pass. Each round's review is saved as `resume-review-round{N}.yml` in the same cache directory.
 
 ```
-Round 1: review -> revise -> humanize
-Round 2: re-review -> revise -> humanize
-Round 3: re-review -> revise -> humanize (final)
+Round 1: review (full) -> revise (scoped) -> humanize (scoped)
+Round 2: re-review (full) -> revise (scoped) -> humanize (scoped)
+Round 3: re-review (full) -> revise (scoped) -> humanize (scoped, final)
 ```
 
 After the final round (or if user declines revision), proceed to step 10.
@@ -235,42 +224,51 @@ After the final round (or if user declines revision), proceed to step 10.
   - `Company` — from Job Analysis (`company`).
   - Join with underscores `_`. **Preserve spaces inside each part** (do not replace spaces within a name/title/company with underscores).
 - Save the assembled YAML.
-- **Validate** (Legacy path only — if the user opted in to yamlresume compatibility at startup):
+- **Typst stub** — written to `data/resumes/{CandidateName}_{JobTitle}_{Company}.typ`, alongside the YAML. The import path is derived from the chosen template name (`layout.template`), not hardcoded:
+  - **If the stub doesn't exist yet** (first generation of this resume), create it fresh:
+
+    ```typst
+    #import "../../templates/{chosen-template-name}/adapter.typ": render
+    #let data = yaml("{CandidateName}_{JobTitle}_{Company}.yml")
+    #render(data)
+    ```
+
+  - **If the stub already exists** (this is a revision pass on an existing resume): leave it alone. Do not regenerate or overwrite it. It may contain hand-tuned `theme: (...)` overrides (font size, spacing, margin) from a prior fitting pass — these must never be silently clobbered. The one exception: if `layout.template` in the YAML has changed since the stub was last written, patch only the `#import` line to match the new template's adapter path, and say so explicitly to the user — do not touch anything else in the file (the `theme:` block, if present, stays exactly as it was).
+  - If a resume runs long (doesn't fit the one-page hard cap after content trimming), proactively tell the user you can tighten it by nudging `font-size`, `spacing`, or `margin` in the stub's `theme:` block — do not build this as a UI control, just offer it conversationally and make the edit if they agree.
+
+- **Validate**: run a clean compile as the correctness check —
 
   ```bash
-  pnpm yamlresume validate "data/resumes/{CandidateName}_{JobTitle}_{Company}.yml"
+  typst compile --root . "data/resumes/{CandidateName}_{JobTitle}_{Company}.typ" /dev/null
   ```
 
-  If validation fails, report the errors and let the user decide whether to fix or keep the file as-is.
-
-  **New Schema path**: skip `yamlresume validate` (it only supports Legacy format). The resume-builder-app performs structural validation at load time.
+  If this fails, report the compile error and fix it before reporting the resume as done.
 
 ## General rules (apply to every section)
 
 - **Format**: output must be valid YAML.
 - **Rich text**: `summary` fields support a limited Markdown subset only — Bold, Italic, Links, Lists (ordered, unordered, nested). **Forbidden**: headings, blockquotes, images, horizontal rules, tables.
-- **Dates**: align with the format in the chosen template (`assets/resume.example.yml` for Legacy, `assets/resume-new-schema.example.yml` for New Schema). For current roles or projects, **omit `endDate` or set it to null**. Do NOT use `"Present"` or `""`.
+- **Dates**: align with the format in [assets/resume.example.yml](assets/resume.example.yml). For current roles or projects, **omit `endDate` or set it to null**. Do NOT use `"Present"` or `""`.
 - **URLs**: omit if unknown, do NOT use `""`.
-- **Forbidden sources**: never read or copy content from `*.example.yml` files. They are structural references only.
+- **Forbidden sources**: never read or copy content from `*.example.yml` files. They are structural references only. This does **not** apply to reference resumes selected under step 4 — those are real prior output and are meant to be read, but only for style/structure (see [references/reference-resume-selection.md](references/reference-resume-selection.md)), never as a source of facts.
 
 ## Quick reference
 
-| Need                                      | File                                                                               |
-| ----------------------------------------- | ---------------------------------------------------------------------------------- |
-| JD analysis prompt                        | [references/job-analysis.md](references/job-analysis.md)                           |
-| Company / business analysis prompt        | [references/company-business-analysis.md](references/company-business-analysis.md) |
-| Projects section prompt                   | [references/section-projects.md](references/section-projects.md)                   |
-| Work Experience section prompt            | [references/section-work.md](references/section-work.md)                           |
-| Skills section prompt                     | [references/section-skills.md](references/section-skills.md)                       |
-| Personal Summary section prompt           | [references/section-personal-summary.md](references/section-personal-summary.md)   |
-| Overall content principles                | [references/overview.md](references/overview.md)                                   |
-| De-AI: English & romance languages        | [references/humanizer-en.md](references/humanizer-en.md)                           |
-| De-AI: Chinese (simplified & traditional) | [references/humanizer-zh.md](references/humanizer-zh.md)                           |
-| Resume quality review prompt              | [references/resume-review.md](references/resume-review.md)                         |
-| Resume revision prompt                    | [references/resume-revision.md](references/resume-revision.md)                     |
-| Review output structural template         | [assets/review.example.yml](assets/review.example.yml)                             |
-| **Legacy**: Resume YAML template          | [assets/resume.example.yml](assets/resume.example.yml)                             |
-| **Legacy**: Per-section examples          | [assets/section-\*.example.yml](assets/)                                           |
-| **New Schema**: Resume YAML template      | [assets/resume-new-schema.example.yml](assets/resume-new-schema.example.yml)       |
-| **New Schema**: Per-section examples      | [assets/section-\*.new-schema.example.yml](assets/)                                |
-| Example JD                                | [assets/jd.example.txt](assets/jd.example.txt)                                     |
+| Need                                      | File                                                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| JD analysis prompt                        | [references/job-analysis.md](references/job-analysis.md)                             |
+| Company / business analysis prompt        | [references/company-business-analysis.md](references/company-business-analysis.md)   |
+| Projects section prompt                   | [references/section-projects.md](references/section-projects.md)                     |
+| Work Experience section prompt            | [references/section-work.md](references/section-work.md)                             |
+| Skills section prompt                     | [references/section-skills.md](references/section-skills.md)                         |
+| Personal Summary section prompt           | [references/section-personal-summary.md](references/section-personal-summary.md)     |
+| Overall content principles                | [references/overview.md](references/overview.md)                                     |
+| De-AI: English & romance languages        | [references/humanizer-en.md](references/humanizer-en.md)                             |
+| De-AI: Chinese (simplified & traditional) | [references/humanizer-zh.md](references/humanizer-zh.md)                             |
+| Resume quality review prompt              | [references/resume-review.md](references/resume-review.md)                           |
+| Resume revision prompt                    | [references/resume-revision.md](references/resume-revision.md)                       |
+| Reference resume selection (style)        | [references/reference-resume-selection.md](references/reference-resume-selection.md) |
+| Review output structural template         | [assets/review.example.yml](assets/review.example.yml)                               |
+| Resume YAML template                      | [assets/resume.example.yml](assets/resume.example.yml)                               |
+| Per-section examples                      | [assets/section-\*.example.yml](assets/)                                             |
+| Example JD                                | [assets/jd.example.txt](assets/jd.example.txt)                                       |

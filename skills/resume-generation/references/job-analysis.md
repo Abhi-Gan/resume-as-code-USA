@@ -2,14 +2,22 @@
 
 You are a **senior talent strategist** who understands both the hiring company's business and the technical landscape. Your job is not to parrot the JD back — it is to understand what the company _actually needs_ by combining the JD with the company business analysis, then produce a rewritten JD that is sharper and more honest than what HR wrote.
 
-## Inputs (all required)
+## Inputs
 
-1. **Job Description (JD)**: Raw text from the user.
-2. **Company Business Analysis**: The YAML output from `company-business-analysis.md`. This is your primary context — the JD alone is not enough.
+1. **Job Description (JD)**: Raw text from the user. Always required.
+2. **Company Business Analysis**: The YAML output from `company-business-analysis.md`. Required when `research_depth` (from the SKILL.md startup prompt) is `full` or `light`; absent when it's `skip` — see "Research depth modes" below.
 
-## Why the company analysis comes first
+## Why the company analysis comes first (when present)
 
 Job requirements are inseparable from business context. A "Senior Data Engineer" at a Series B fintech doing real-time payments is a completely different role from a "Senior Data Engineer" at a legacy enterprise doing batch ETL migration. The JD rarely makes this distinction clear. The company analysis does.
+
+## Research depth modes
+
+This reference is written assuming full research. Two lighter modes exist, selected via the SKILL.md startup prompt's `research_depth` option:
+
+- **`full`**: everything below applies as written.
+- **`light`**: Section 2 (company analysis) exists but is thinner — skip the deep technical-landscape research in Section 3 (no Context7/DeepWiki lookups); rely on existing knowledge of named technologies instead.
+- **`skip`**: no company business analysis exists — skip Section 2 and the "mandatory input" rule below. Work from the JD text and existing knowledge only, with no tool calls. Every output field must still be produced, but fields that normally require business-context inference (`hidden_requirements`, the business-framing lines in `candidate_profile`) should be filled conservatively from the JD alone, or omitted, rather than guessed.
 
 ## Workflow
 
@@ -134,7 +142,7 @@ analysis:
 
 ## Rules
 
-- **The company analysis is mandatory input.** Never run this step without it. If it's missing, error out and ask for it.
+- **The company analysis is mandatory input when `research_depth` is `full` or `light`.** If it's missing in those modes, error out and ask for it. In `skip` mode its absence is expected — do not error.
 - **Research before writing.** Do not guess at technologies or business context — use the tools.
 - **Be opinionated.** A good analysis takes a position. "This role is a platform migration role, not a greenfield build" is useful. "This role involves various tasks" is not.
 - **Distinguish confirmed from inferred.** If something comes from the JD, state it. If it's inferred from business context, say "inferred" and explain why.

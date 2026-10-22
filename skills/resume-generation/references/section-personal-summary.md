@@ -1,4 +1,4 @@
-**Template gate**: if `template = techCompact`, skip this step entirely — do not generate `section-personal-summary.yml`, and leave `basics.summary` empty/omitted in the assembled resume. This template has no personal summary section. Everything below applies only when `template = jake`.
+**Template gate**: for Tech-Compact-style templates (`tech-compact`, `zhiweio`), skip this step entirely — do not generate `section-personal-summary.yml`, and leave `basics.summary` empty/omitted in the assembled resume. These templates have no personal summary section. Everything below applies only when `template = jake`.
 
 Using session context (personal info, **GENERATED Projects**, **GENERATED Work Experience**, **GENERATED Skills**, certifications, open-source), Job Description analysis, and Company Business Analysis, write a targeted professional summary.
 
